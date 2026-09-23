@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RAG 进阶方案｜多路检索、条款完整性与增量更新</title>
+<style>
+:root{--ink:#172e41;--text:#374c5c;--muted:#657a89;--accent:#146f72;--line:#d8e3e8;--bg:#edf2f4;--tint:#eff7f7}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.85 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}main{max-width:1080px;margin:32px auto;background:white;padding:48px 58px;border:1px solid var(--line);border-radius:12px}h1,h2,h3{color:var(--ink);line-height:1.5}h1{font-size:33px;margin:10px 0 12px;letter-spacing:-.02em}h2{font-size:23px;margin:36px 0 14px;padding-top:8px;border-top:1px solid var(--line)}h3{font-size:17px;margin:21px 0 8px}p{margin:9px 0}a{color:var(--accent);text-underline-offset:3px;overflow-wrap:anywhere}.eyebrow{color:var(--accent);font-weight:700;letter-spacing:2px;font-size:12px}.sub{font-size:17px;color:var(--muted)}.meta,.small{font-size:12px;color:var(--muted)}.note{background:var(--tint);border-left:3px solid var(--accent);padding:14px 18px;margin:18px 0}.warning{background:#fbf7ed;border-color:#ac8738}.nav{display:flex;gap:8px 18px;flex-wrap:wrap;padding:17px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin:25px 0}.nav a{font-size:13px;text-decoration:none}.table-wrap{overflow-x:auto;margin:14px 0;border:1px solid var(--line);border-radius:6px}table{width:100%;border-collapse:collapse;font-size:13.5px}th,td{padding:11px 13px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line)}th{background:#f2f6f8;color:var(--ink)}th:first-child,td:first-child{width:20%;min-width:145px}td:first-child code{white-space:nowrap}tr:last-child td{border-bottom:0}ul,ol{padding-left:23px}li{margin:7px 0}code{font:12.5px/1.7 ui-monospace,SFMono-Regular,Consolas,monospace;background:#f1f4f6;padding:2px 4px;border-radius:3px;overflow-wrap:anywhere}pre{overflow-x:auto;background:#172e41;color:#e8f2f6;border-radius:7px;padding:18px;font:12.5px/1.8 ui-monospace,SFMono-Regular,Consolas,monospace}pre code{color:inherit;background:none;padding:0;overflow-wrap:normal}.flow{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:17px 0}.flow div{background:#f1f6f8;border:1px solid var(--line);padding:13px;border-radius:6px}.flow b{display:block;color:var(--ink);font-size:14px}.flow span{font-size:12px;color:var(--muted)}.two{display:grid;grid-template-columns:1fr 1fr;gap:16px}.card{border:1px solid var(--line);border-radius:7px;padding:15px 18px}.card h3{margin-top:0}.status{display:inline-block;background:#e4f1ee;color:#17624e;border-radius:4px;padding:0 7px;font-size:12px;white-space:nowrap}.planned{background:#eef0f9;color:#555c88}.sources li{font-size:12.5px}blockquote{margin:14px 0;border-left:3px solid #bcced8;padding:11px 17px;background:#f6f8fa}footer{border-top:1px solid var(--line);padding-top:15px;margin-top:30px;color:var(--muted);font-size:12px}a:focus-visible{outline:2px solid var(--accent);outline-offset:3px}@media(max-width:740px){main{margin:0;padding:27px 21px;border:0;border-radius:0}h1{font-size:27px}h2{font-size:21px}.flow,.two{grid-template-columns:1fr}body{font-size:14px}th,td{padding:9px}}@media print{body{background:white}main{margin:0;max-width:none;border:0;padding:0}.nav{display:none}h2,h3{break-after:avoid}tr,.card,.note{break-inside:avoid}pre{white-space:pre-wrap}.table-wrap{overflow:visible}a{color:inherit}}
+</style>
+</head>
+<body><main>
+<header><div class="eyebrow">工程方案研究 · 非既有业绩说明</div><h1>不只是“加一路图谱”<br>让政策 RAG 从相关问答走向条款完整性</h1><p class="sub">多路证据检索 × 按范围全文读取 × 版本化增量更新 × 可复核评测</p><p class="meta">2026-09-21｜基于官方文档、源码与公开简历案例；未访问公司代码或执行模型调用、压测，未修改当前简历</p></header>
+<div class="note"><strong>结论：</strong>多路检索、图谱关系与增量更新值得做，但不能以“组件更高级”代替效果证据。建议采用两条查询路径：普通问答走相关性检索；“列全措施／标准”走限定文件范围的逐章读取与条目抽取。图谱补充发现线索，全文通道负责系统性覆盖，两者不是替代关系。</div>
+<nav class="nav" aria-label="报告目录"><a href="#market">公开写法对标</a><a href="#architecture">整体架构</a><a href="#storage">全文如何读取</a><a href="#enumeration">完整性流程</a><a href="#fusion">图谱与融合</a><a href="#updates">增量更新</a><a href="#evaluation">指标与压测</a><a href="#delivery">落地与简历</a><a href="#sources">来源</a></nav>
+
+<section id="market"><h2>01 / 网上进阶 RAG 简历怎样体现深度</h2>
+<p>检索到的有效表达通常不是把解析、向量库、重排各写一条，而是解释<strong>失败场景、方案选择、个人动作和验证结果</strong>。本次核对到一份个人自述简历、一份教学案例及一个招聘机构的官方岗位页面；未获得两份可独立核验的真人履历，不将范文指标当作市场实绩。</p>
+<div class="table-wrap"><table><thead><tr><th>来源与身份</th><th>值得借鉴的具体写法</th><th>不能照搬什么</th></tr></thead><tbody>
+<tr><td><a href="https://www.suchuhong.cn/resume.html">个人网站自述简历</a></td><td>交代异步入库、ES 候选检索与候选内向量精排，并说明使用摘要向量来处理长段落语义稀释。</td><td>其日活、好评率没有附可独立复核的监控或实验记录。仅借鉴“问题→取舍”的表达，不复制数字。</td></tr>
+<tr><td><a href="https://notes.kamacoder.com/jianli/llm/llm_6.html">代码随想录：简历教学</a></td><td>按检索链路、数据质量、性能等维度组织，强调“做了什么改动→拿到什么结果”。</td><td>示例中的 P99、召回率提升属于教学数字，未给出完整测试条件，不能当作应达到的门槛。</td></tr>
+<tr><td><a href="https://www.sribd.cn/recruitment/1442">深圳大数据研究院：官方招聘</a></td><td>要求图谱 RAG、增量更新、版本管理、扩展与性能优化，说明进阶要求包含持续运行和数据治理，而不仅是问答链路。</td><td>该岗位的规模与架构要求不能直接套成三年经验候选人的成果。此处用于校准能力方向。</td></tr>
+</tbody></table></div>
+<p><strong>对上一版的修正：</strong>MinerU、分块、混合检索、RRF、rerank、父文档召回应合成一条“业务规模与检索底座”，其余篇幅留给真实解决过的工程问题。尚未完成的优化先作为独立设计与实战任务，不能为凑足五条而编造成果。</p>
+</section>
+
+<section id="architecture"><h2>02 / 推荐架构：三类检索通道，加一条完整性通道</h2>
+<div class="flow"><div><b>1. 文档与版本底座</b><span>原始文件、解析结果、块顺序、来源和生效范围</span></div><div><b>2. 查询任务判定</b><span>普通问答 / 枚举清单；抽取地区、时间、文件范围</span></div><div><b>3. 分路处理</b><span>多路检索，或按文件范围逐章读取与抽取</span></div><div><b>4. 证据核对与输出</b><span>条目合并、原文引用、覆盖状态与未完成项</span></div></div>
+<div class="two"><div class="card"><h3>普通问答：找到最相关的证据</h3><p>词法／稀疏检索 ＋ 稠密向量检索 ＋ 图实体／关系检索 → 原文块 ID 归一 → 融合去重 → rerank → 按预算组织上下文 → 回答。</p><p class="small">适用于概念解释、具体问题、跨文件关联。可采用 Top K / Top N，但要通过评测选择参数。</p></div><div class="card"><h3>枚举任务：遍历声明范围内的材料</h3><p>确定政策文件与有效版本 → 读取所有相关正文、表格和附录 → 分章抽取候选条目 → 保留适用条件后去重 → 引用校验与覆盖检查 → 结构化清单。</p><p class="small">不能只把 Top K 调大；也不能因 rerank 分数低就静默丢弃尚未检查的章节。</p></div></div>
+<div class="table-wrap"><table><thead><tr><th>职责</th><th>优先选型</th><th>必要边界</th></tr></thead><tbody>
+<tr><td>原件与解析产物</td><td>已有文件存储；小样本可用本地目录，后续可接 MinIO 等对象存储</td><td>保留原始文件及资源包。对象存储只负责保存，不自动提供检索或完整性。</td></tr>
+<tr><td>文档目录、版本与顺序块</td><td>PostgreSQL；个人小实验可先用 SQLite</td><td>这是普通关系查询，避免为取全文再引入专门“大模型框架”。</td></tr>
+<tr><td>语义／稀疏索引</td><td>优先复用现有检索服务；Qdrant 是可选实现</td><td>当前生产向量库与版本尚未核验。本报告不假定已经部署 Qdrant。</td></tr>
+<tr><td>词法检索</td><td>复用现有稀疏通道；确有需要时再加 OpenSearch BM25</td><td>BM25 是相关性排序，不是“精确全量查找”；中文分词、文号规范化须验证。不必为简历堆一套新集群。</td></tr>
+<tr><td>图关联发现</td><td>LightRAG 的 local/global/hybrid 路径，接入其来源块结果</td><td>图结果先映射回原文块。不将未验证的实体合并描述当作法律条款证据。</td></tr>
+<tr><td>分章抽取与任务状态</td><td>Python + LangGraph；结构化结果可用 Pydantic 校验</td><td>Send 可表达动态分支；并发上限、外部限额、重试和幂等另行设计，不能认为框架自动解决。</td></tr>
+</tbody></table></div>
+<p class="small">技术依据：Qdrant 支持预取与融合查询；OpenSearch 默认关键词评分采用 BM25；LangGraph 支持 Send 与状态 reducer。以上是可用机制，不是已完成的集成。见 <a href="#s4">[4]</a>、<a href="#s7">[7]</a>、<a href="#s8">[8]</a>。</p>
+</section>
+
+<section id="storage"><h2>03 / “精确检索”和“全文召回”到底怎么实现</h2>
+<p><strong>精确检索有两层含义：</strong>按文号、文件 ID、版本、地区、日期做确定性过滤；随后读取这些文件的全部内容。它并不意味着能用 SQL 完全理解“治霾措施”的语义，主题判断与条目抽取仍需要规则和模型，并且可能出错。</p>
+<h3>先建立能找回原文的数据关系</h3>
+<p>下面是建议的应用数据模型，<strong>不是声称你们现有数据库已经有这些字段，也不是 MinerU 原生字段列表</strong>：</p>
+<div class="table-wrap"><table><thead><tr><th>表／记录</th><th>建议字段</th><th>用途</th></tr></thead><tbody>
+<tr><td><code>documents</code></td><td>doc_id、标题、文号、发文机构、行政区代码、原始链接</td><td>标识一份逻辑文件；别用文件名充当唯一身份。</td></tr>
+<tr><td><code>document_versions</code></td><td>version_id、doc_id、content_hash、发布日期、生效／废止时间、替代版本、解析状态、索引状态</td><td>区分修订、同名文件和有效性。未知生效／废止时间保留未知，不自动推断。</td></tr>
+<tr><td><code>document_blocks</code></td><td>block_id、version_id、block_order、parent_id、块类型、页码、text、table_html、原文定位</td><td>保存全文的有序组成部分；可读取父章节，也可读取整个版本。</td></tr>
+<tr><td><code>index_mapping</code></td><td>block_id ↔ 向量 point_id ↔ 图来源 chunk_id；索引批次</td><td>让不同通道返回同一种证据标识，便于融合、引用和失效清理。</td></tr>
+<tr><td><code>extraction_runs</code></td><td>任务 ID、查询范围、版本清单、已处理块、失败块、条目与引用、模型／提示词版本</td><td>区分“已经检查没有条目”和“尚未处理”，支持恢复和审计。</td></tr>
+</tbody></table></div>
+<h3>路径 A：直接按版本读取关系库中的全文块</h3>
+<pre><code>-- 建议数据模型的示意查询；不是在现有数据库执行的迁移或 SQL。
+SELECT block_id, block_order, page_no, block_type, text, table_html
+FROM document_blocks
+WHERE version_id = :version_id
+ORDER BY block_order;</code></pre>
+<p>读取的是该版本的全部已保存块，不经过相似度排序。大文件可以用 <code>block_order</code> 做顺序游标分批读取，再依次抽取；“取得全文”不等于一次把全文塞给模型。</p>
+<h3>路径 B：如果切片已经完整保存在 Qdrant</h3>
+<p>可用 <code>Scroll</code> 加 payload 条件读取某一文件版本的所有点。它不需要查询向量。示例字段是建议的应用字段：<a href="#s5">[5]</a><a href="#s6">[6]</a></p>
+<pre><code>POST /collections/{collection_name}/points/scroll
+{
+  "filter": {
+    "must": [
+      {"key": "doc_id", "match": {"value": "示例文件ID"}},
+      {"key": "version_id", "match": {"value": "示例版本ID"}}
+    ]
+  },
+  "limit": 256,
+  "with_payload": true,
+  "with_vector": false
+}</code></pre>
+<p>继续用响应中的 <code>next_page_offset</code> 作为下一页的 <code>offset</code>，直到为空；默认按 point ID 返回，取齐后仍需按应用保存的 <code>block_order</code> 排序。此处 256 只是示例批大小，不是性能结果。<strong>doc_id 是 payload 字段，不能误用 has_id 把它当向量点 ID。</strong>使用 <code>order_by</code> 时分页方式不同，不能照搬默认 offset 循环。</p>
+<h3>如果信息已经丢失，不能只改检索代码</h3>
+<p>只要保存了所有块、文件归属与顺序，就有机会从现有存储重建全文；若只保留了部分片段，或表格／附件根本没入库，需要从原始文件重新解析。缺失原件时必须记录缺口，不能声称可恢复完整内容。</p>
+<p>MinerU 的当前官方文档已展示 4.0 统一模型：有序页面、语义块及页面定位，并区分 MiddleJson、Structured Content 和资源包；旧部署可能仍是其他协议。应保留现有版本实际产物，写适配层转为上述统一块模型，不要求先升级。独立 JSON 也不必然携带所有图片资源。<a href="#s3">[3]</a></p>
+</section>
+
+<section id="enumeration"><h2>04 / 完整性流程：先看全，再列全，最后证明覆盖范围</h2>
+<p>以“某年平顶山市有哪些治霾措施和标准”为例，以下是<strong>建议的新流程</strong>，不是当前项目已经实现的功能：</p>
+<ol>
+<li><strong>澄清任务范围。</strong>区分“当年发布”与“当年仍有效”；区分本市发布的文件与适用于本市的省级／国家文件。措施、排放限值、考核标准分别组织。缺少这些条件时先澄清，不能静默猜测。</li>
+<li><strong>得到文件清单与版本快照。</strong>按文档目录过滤，并把版本 ID 固定到本次任务。完整性通道不能只靠向量 Top K 选文件；若语料目录本身不完整，只能声明“在本次已收录文件范围内”。图谱和引用关系可提示范围外遗漏，不能自动证明目录已经穷尽。</li>
+<li><strong>读取正文、表格和附录。</strong>按顺序分页取回所有块。表格保留表头、单位和脚注，跨页表格需要关联检查；无法解析的页面或附件进入失败清单。</li>
+<li><strong>逐章节抽取候选条目。</strong>用 LangGraph Send 分派章节任务，返回结构化条目：类型、原文、适用条件、数值与单位、版本 ID、块 ID、页码。优先利用编号项、列表和表格行作为候选边界，但仍检查没有编号的普通段落。</li>
+<li><strong>带证据汇总，不让模型任意压缩。</strong>程序合并完全重复项，对语义近似项谨慎判重；不同适用对象、时效或阈值的标准不能合并。最终清单优先由校验后的条目集合渲染，模型负责解释而不是重新决定保留哪些项。</li>
+<li><strong>执行覆盖门禁。</strong>检查声明范围内每份文件、每个块是否处理完成；校验引用片段确实存在于对应版本。引用存在只能证明出处存在，不能单独证明结论正确或没有漏项。抽取遗漏仍需人工金标评测。</li>
+<li><strong>按实际完成程度回答。</strong>返回条目及出处、已处理文档范围、未解析／未完成项。超时后应标记“部分完成”，支持继续任务或分批展示，而不是把前几个结果当完整答案。</li>
+</ol>
+<div class="note warning"><strong>能保证与不能保证：</strong>程序可以校验声明范围内的文档／块是否遍历完成，但“遍历完成”不等于“语义抽取零遗漏”。更不能证明语料库包含现实中的全部政策。产品承诺应限定范围，业务效果用条目级测试验证。</div>
+<p class="small">文档级检索并不是新的概念：LlamaIndex 的 Document Summary Index 会取回选中文档的所有节点。但其文件选择仍可能基于摘要判断；拿到选中文档全文，不等于选中了所有应纳入的文件。无需为了这一机制迁移现有 LangGraph 技术栈。<a href="#s9">[9]</a></p>
+</section>
+
+<section id="fusion"><h2>05 / 图谱如何加入，而不是再堆一个框架名</h2>
+<p><strong>建议的分工：</strong>词法路补文号和明确术语；向量路补同义表达；图关系路补实体关联和跨文档线索。三个通道都返回可排序的 <code>block_id</code> 列表，再在应用层融合、去重、精排。</p>
+<ol>
+<li>沿用现有业务检索索引。若已能拿到独立的稀疏／稠密结果，统一各路输出为 <code>{block_id, rank, route, version_id}</code>；不要直接比较 BM25、余弦和关系权重的原始分数。</li>
+<li>图路可选择 LightRAG <code>hybrid</code>（local＋global），将实体／关系命中的来源 chunk 映射到 <code>block_id</code>。若外层已有向量路，不应无解释地再把 <code>mix</code> 的向量路重复加权。</li>
+<li>应用层按路内排名做 RRF 或加权 RRF，并保留路由来源；融合的是同粒度原文证据，而不是把实体名称和文本块混在一起。LightRAG 自身的 hybrid/mix 合并机制不等于 RRF，不能把外层算法写成库原生能力。</li>
+<li>融合前后检查版本和权限等允许范围；本次只设计版本与文档范围。最终模型输入使用有效原文，不直接把图中可能混合了新旧版本的实体描述当作政策事实。</li>
+<li>对普通问答统一精排并控制上下文；对枚举任务，图谱只作发现与补充通道，不作为阻止逐章读取的前置筛选器。</li>
+</ol>
+<p>图谱会增加构建成本，还可能出现漏抽关系、同名实体误合并与过时描述。需要通过消融回答：“它找回了哪些原来漏掉的条目，代价是多少？”若结果没有增益，不应为了简历强留图路。<a href="#s10">[10]</a></p>
+</section>
+
+<section id="updates"><h2>06 / 增量更新的价值在版本一致性，不只在少算一点向量</h2>
+<p>政策资料需要区分新文件、同文修订、废止与删除。内容哈希可以检测字节变化，但不能判断法律上的替代或生效关系，这些元数据需可靠来源或人工确认。</p>
+<div class="flow"><div><b>登记变更</b><span>逻辑文档 ID、内容哈希、解析管线版本；幂等任务键</span></div><div><b>构建新版本</b><span>解析、块索引、向量及图谱更新；保留旧版本</span></div><div><b>校验并发布</b><span>块数与来源映射检查；成功后切换可查询版本</span></div><div><b>失效与回归</b><span>清理旧索引、处理共享图元素、记录失败和重试</span></div></div>
+<ul>
+<li><strong>失败可恢复。</strong>关系库记录任务状态与 outbox 事件；消费者根据幂等键重试，避免同一文件反复入库。不要把“有消息队列”当成恰好一次处理的证明。</li>
+<li><strong>跨索引不是天然事务。</strong>向量库、关系库和图存储不共享一个数据库事务。建议先构建后发布版本清单，查询时验证证据的有效版本；清理任务可重试，失败版本不能悄悄进入结果。</li>
+<li><strong>图的共享实体不能随文档全删。</strong>LightRAG 已有来源关联及文档删除后的受影响图元素重建机制；需要结合具体版本的 API 验证。更新文档可能需要“旧版本贡献失效＋新版本入库”，不能只追加新文本。</li>
+<li><strong>版本过滤需要自己实现。</strong>不能假设 LightRAG 原生提供完整的政策时效隔离。初版可把图作为候选发现层、最终按版本核对原文；若要求图描述本身强隔离，还需验证分区／workspace 或独立索引策略。</li>
+<li><strong>回归测试覆盖四种变更。</strong>新增、修订、废止、删除；检查新版本可见性、旧条款残留、同名实体污染与共享来源保留。更新耗时和恢复结果均由日志测量。</li>
+</ul>
+</section>
+
+<section id="evaluation"><h2>07 / 该写什么数据，以及怎么测出来</h2>
+<p>不要用一个“准确率”包办所有质量。完整性问题最关键的是<strong>条目召回率和全项覆盖率</strong>，并同时看错误条目和时效误配。下列全部是待测指标，没有任何已经取得的数值。</p>
+<div class="table-wrap"><table><thead><tr><th>指标</th><th>口径</th><th>必须记录的条件</th></tr></thead><tbody>
+<tr><td>条目召回率</td><td>正确找出的应答条目 ÷ 金标应答条目；候选、最终上下文和答案阶段分别统计</td><td>问题范围、文件版本、标注规则、遗漏属于哪个阶段</td></tr>
+<tr><td>答案条目精确率</td><td>正确条目 ÷ 输出条目；拆分过期、范围外、无依据的错误</td><td>不能靠多输出无关条目换取召回率</td></tr>
+<tr><td>全项覆盖题率</td><td>全部应答条目均覆盖的问题占比；无答案题单独评估</td><td>同时报告是否有多余错误项；无答案题不能靠空答案抬高覆盖率</td></tr>
+<tr><td>引用正确性与时效性</td><td>引用能否定位且支持结论；错误版本、失效条款占比</td><td>页码、块定位、原文核对及人工抽查</td></tr>
+<tr><td>查询性能与成本</td><td>排队、检索、首个输出和完整结果分别测 p50/p95/p99；记录 token 与费用</td><td>机器、语料、模型、候选量、上下文长度、缓存、成功／失败口径</td></tr>
+<tr><td>容量与更新</td><td>在途请求、成功吞吐、错误／超时率；入库更新时间、失效残留和恢复记录</td><td>普通问答与长枚举任务分开压测，明确是否包含外部模型请求</td></tr>
+</tbody></table></div>
+<h3>建议的最小对照实验</h3>
+<p>沿用前一份报告的试验规模建议：先选约 60 份公开政策、30 个问题，开发集与封存测试集分开；这只是验证流程的起点，不足以代表全行业效果。包含跨章节、多版本、表格附录、无答案和简单概念问题，人工核对金标。</p>
+<div class="table-wrap"><table><thead><tr><th>组别</th><th>方案</th><th>回答的问题</th></tr></thead><tbody><tr><td>A</td><td>现有混合检索＋RRF＋rerank＋父章节召回</td><td>真实基线是什么？</td></tr><tr><td>B</td><td>A＋图关联检索</td><td>单独加图能补多少遗漏，花多少成本？</td></tr><tr><td>C</td><td>A＋限定范围的逐章抽取通道</td><td>完整性路径的独立贡献是什么？</td></tr><tr><td>D</td><td>C＋图谱发现与补充线索</td><td>已有完整性通道后，图是否仍有额外价值？</td></tr></tbody></table></div>
+<p>普通问答的多路比较应固定解析结果、模型、上下文预算及缓存条件。枚举任务本来可能读取更多内容，不能假装成本相同：同时报告预算受控比较与实际完整流程成本。不要只挑成功案例，也不要将新分块、新模型和图谱的收益混在一起。</p>
+<h3>并发能力可以建设，但要单独验证</h3>
+<p>为长任务增加任务队列、受限 worker、模型调用信号量、超时／重试和取消机制；LangGraph checkpoint 用于状态恢复，不能代替全局任务准入和 API 配额治理。用 Locust 或等价工具逐级加压，记录实际模型限额与错误率。可以先重放固定响应测应用开销，但该结果不能称为包含真实模型调用的端到端吞吐。</p>
+<p class="note warning">活跃会话数、正在处理的 HTTP 请求数、同时发出的模型调用数与成功 QPS 是不同指标。“并发支持 150＋”“准确率 95%”等数字不能从框架特性或其他人的简历推算。后续真实测试得到什么，就报告什么。</p>
+</section>
+
+<section id="delivery"><h2>08 / 实施顺序与简历重构</h2>
+<div class="table-wrap"><table><thead><tr><th>阶段</th><th>最小交付物</th><th>通过标准</th></tr></thead><tbody>
+<tr><td>一：先把原文取齐</td><td>公开样本、统一块模型、按版本读取接口、失败块清单、初始金标与基线</td><td>能找回已保存的所有正文／表格／附件块；来源可定位；不能解析的内容被显式标记</td></tr>
+<tr><td>二：完成完整性路径</td><td>查询范围、逐章抽取、条件保留、去重与证据校验、A/C 对照</td><td>对每个问题解释覆盖范围与遗漏阶段；不以处理完成率冒充答案召回率</td></tr>
+<tr><td>三：加入图谱与多路融合</td><td>图 chunk 到原文 block 的映射、三路排名、消融日志、B/D 对照</td><td>能指出图路独有的有效证据，并同时报告成本和失败案例；无收益可不保留</td></tr>
+<tr><td>四：做更新与负载验证</td><td>版本任务、幂等重试、增删改回归、负载脚本和原始日志</td><td>数据一致性与容量指标有条件、有记录，不把试验结果冒充生产运营数据</td></tr>
+</tbody></table></div>
+<h3>简历不再是三个基础步骤，而是五个工程主题</h3>
+<div class="table-wrap"><table><thead><tr><th>主题</th><th>应讲清的价值</th><th>目前状态</th></tr></thead><tbody>
+<tr><td>业务规模与检索底座</td><td>4.4 万份环境政策标准；解析、混合检索、精排与父章节召回合并表达</td><td><span class="status">已有实践</span></td></tr>
+<tr><td>多路检索与证据融合</td><td>各路解决什么缺口，如何映射、去重与比较收益</td><td><span class="status planned">待实现并评测</span></td></tr>
+<tr><td>枚举完整性与证据校验</td><td>文件范围、跨章节抽取、条件保留、漏项定位</td><td><span class="status planned">待实现并评测</span></td></tr>
+<tr><td>增量更新与版本一致性</td><td>新增／修订／删除，幂等恢复、旧内容失效</td><td><span class="status planned">待实现并评测</span></td></tr>
+<tr><td>质量与服务容量</td><td>条目级测试集、消融、时延吞吐与成本边界</td><td><span class="status planned">待实现并评测</span></td></tr>
+</tbody></table></div>
+<p>当前可以先将真实底座压成一条，避免三条重复：</p>
+<blockquote>参与约 4.4 万份大气、水环境政策与标准文件的 RAG 问答交付，采用 MinerU 解析与分块入库，结合混合检索、RRF 融合、rerank 精排及父章节召回，组织业务问答上下文。</blockquote>
+<p>其余四个主题目前是<strong>实战任务结构</strong>，不是可直接投递的既成业绩。完成公开语料个人项目后，可按真实实施范围、实验结果和代码证据写入独立项目；不能仅把 LightRAG 功能汇总后改成公司已落地的描述。现有公司 Agent/MCP 的真实负责人经历仍是当前简历最强的差异化证据。</p>
+</section>
+
+<section id="sources" class="sources"><h2>来源与核验范围</h2><ol>
+<li id="s1">公开表达对标：<a href="https://www.suchuhong.cn/resume.html">个人自述简历</a>；<a href="https://notes.kamacoder.com/jianli/llm/llm_6.html">代码随想录简历教学</a>。仅验证页面写法，不背书其中业绩数字。</li>
+<li id="s2"><a href="https://www.sribd.cn/recruitment/1442">深圳大数据研究院官方招聘</a>：图谱 RAG、增量与版本管理、扩展及性能要求，页面截止日期为 2026-12-31。</li>
+<li id="s3"><a href="https://opendatalab.github.io/MinerU/reference/output_files/">MinerU 输出格式</a>；<a href="https://github.com/opendatalab/MinerU/blob/master/docs/zh/reference/output_files.md">对应中文源码文档</a>。2026-09-21 读取；内容展示 4.0 协议，实际部署须以自身版本为准。</li>
+<li id="s4"><a href="https://qdrant.tech/documentation/search/hybrid-queries/">Qdrant Hybrid Queries</a>：prefetch、多路融合与重排机制。</li>
+<li id="s5"><a href="https://qdrant.tech/documentation/search/filtering/">Qdrant Filtering</a>：payload 条件与索引；字段匹配区别于 point ID 过滤。</li>
+<li id="s6"><a href="https://qdrant.tech/documentation/manage-data/points/">Qdrant Points / Scroll</a>：过滤读取、分页、排序与载荷控制。</li>
+<li id="s7"><a href="https://docs.opensearch.org/latest/search-plugins/keyword-search/">OpenSearch Keyword Search</a>：BM25 与词法检索。中文分析器与部署未在本次进行验证。</li>
+<li id="s8"><a href="https://docs.langchain.com/oss/python/langgraph/graph-api">LangGraph Graph API</a>：Send 动态分支与 reducer；<a href="https://docs.langchain.com/oss/python/langgraph/persistence">Persistence</a>：状态持久化。应用级限额与幂等为本报告建议，不归为框架自动能力。</li>
+<li id="s9"><a href="https://www.llamaindex.ai/blog/a-new-document-summary-index-for-llm-powered-qa-systems-9a32ece2f9ec">LlamaIndex Document Summary Index</a>（2023-05-08）：选中文档后取回其全部节点，不能保证文件选择没有遗漏。</li>
+<li id="s10"><a href="https://github.com/HKUDS/LightRAG/blob/c7e7a24fc85b4dd904e9494b2053b9a529515406/lightrag/base.py#L89-L175">LightRAG QueryParam</a>；<a href="https://github.com/HKUDS/LightRAG/blob/c7e7a24fc85b4dd904e9494b2053b9a529515406/lightrag/operate.py#L5280-L5498">local/global/hybrid/mix 分支与轮流合并</a>；<a href="https://github.com/HKUDS/LightRAG/blob/c7e7a24fc85b4dd904e9494b2053b9a529515406/lightrag/lightrag.py#L6727-L6735">文档删除与图元素重建说明</a>。基于本轮前序已核验的固定快照，不假定每个发行版均一致。</li>
+</ol><p class="small">检索与阅读日期：2026-09-21。已验证官方机制和公开页面；未读取公司数据库、未审计实际项目代码、未运行数据迁移或负载实验。表结构、工作流、实验分组与实施顺序属于建议设计，不是已运行实现。</p></section>
+<footer>独立研究与实战设计 · 无外部依赖、无上传与发布 · 当前简历文件保持不变</footer>
+</main></body></html>

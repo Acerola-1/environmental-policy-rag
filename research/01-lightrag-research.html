@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="基于官方仓库与论文的 LightRAG 检索机制研究，以及政策条款完整性个人实验路线。尚未实施，不代表公司业绩。">
+  <title>LightRAG 研究｜检索机制与政策条款完整性实验</title>
+  <style>
+    :root { color-scheme: light; --ink:#23313e; --muted:#63717b; --line:#dce3e6; --accent:#176b67; --paper:#ffffff; --bg:#f4f6f5; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif; font-size:15px; line-height:1.85; }
+    main { max-width:1000px; margin:40px auto; padding:44px 54px; background:var(--paper); border:1px solid var(--line); border-radius:12px; }
+    header { padding-bottom:25px; border-bottom:2px solid var(--accent); }
+    .eyebrow { color:var(--accent); font-size:12px; letter-spacing:2px; font-weight:700; }
+    h1 { margin:10px 0 8px; font-size:34px; line-height:1.3; letter-spacing:-.5px; }
+    .subtitle { margin:0; color:var(--muted); font-size:16px; }
+    .meta { color:var(--muted); font-size:12px; margin-top:13px; }
+    h2 { margin:28px 0 10px; font-size:20px; line-height:1.5; }
+    p { margin:9px 0; }
+    a { color:var(--accent); text-decoration:underline; text-underline-offset:3px; overflow-wrap:anywhere; }
+    a:hover { color:#104946; }
+    a:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+    .ref { font-size:12px; white-space:nowrap; }
+    .callout { padding:13px 17px; background:#eef6f3; border-left:3px solid var(--accent); margin:18px 0; }
+    .table-wrap { overflow-x:auto; border:1px solid var(--line); border-radius:7px; margin:12px 0; }
+    table { width:100%; border-collapse:collapse; font-size:14px; }
+    th,td { text-align:left; vertical-align:top; padding:10px 13px; border-bottom:1px solid var(--line); }
+    th { background:#f1f5f4; font-weight:650; }
+    th:first-child,td:first-child { width:92px; }
+    tr:last-child td { border-bottom:0; }
+    code { font-family:ui-monospace,SFMono-Regular,Consolas,monospace; font-size:.9em; background:#eff2f4; padding:1px 4px; border-radius:3px; overflow-wrap:anywhere; }
+    ul,ol { padding-left:23px; margin:9px 0; }
+    li { margin:7px 0; }
+    .small { color:var(--muted); font-size:13px; }
+    .label { font-weight:700; color:var(--accent); }
+    blockquote { margin:12px 0; padding:12px 17px; border-left:3px solid #b8c8d0; background:#f6f8fa; }
+    .boundary { border-top:1px solid var(--line); padding-top:2px; }
+    .sources { margin-top:30px; padding-top:2px; border-top:1px solid var(--line); font-size:12px; line-height:1.75; color:var(--muted); }
+    .sources h2 { font-size:17px; margin-top:18px; }
+    .sources ol { padding-left:22px; }
+    footer { margin-top:22px; color:var(--muted); font-size:12px; }
+    @media (max-width:700px) { main { margin:0; padding:26px 20px; border:0; border-radius:0; } h1 { font-size:28px; } body { font-size:14px; } th,td { padding:9px; } }
+    @media print { body { background:white; } main { margin:0; padding:0; max-width:none; border:0; } h2 { break-after:avoid; } tr,blockquote,.callout { break-inside:avoid; } a { color:inherit; } .table-wrap { overflow:visible; } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="eyebrow">官方证据核验 · 独立研究</div>
+    <h1>LightRAG 能否补齐政策条款？</h1>
+    <p class="subtitle">检索机制、能力边界与待实施个人实验</p>
+    <div class="meta">检索日期：2026-09-21（北京时间）｜仅文献与代码研究，未运行项目、未修改简历</div>
+  </header>
+
+  <article id="report-body">
+    <section aria-labelledby="identity">
+      <h2 id="identity">01 / 身份与版本</h2>
+      <p><strong>工作假设：</strong>“light graph”指 <strong>HKUDS/LightRAG</strong>。其官方 README 与论文互链，标题为《LightRAG: Simple and Fast Retrieval-Augmented Generation》；这符合“知识图谱 RAG”的描述，但没有用户原始链接，不能最终确认。LightGraph、LightGraphs.jl、Microsoft GraphRAG 不应混为一谈。</p>
+      <p>论文首投于 <strong>2024-10-08</strong>，v3 为 <strong>2025-04-28</strong>；仓库标注 EMNLP2025。检索时最新发行版为 <strong>v1.5.7（2026-09-02）</strong>。下述实现核验固定在 main 提交 <code>c7e7a24</code>（2026-09-20，UTC），<strong>不把该快照全部能力归入 v1.5.7 或原论文</strong>。<a class="ref" href="#s1">[1]</a><a class="ref" href="#s2">[2]</a></p>
+    </section>
+
+    <section aria-labelledby="modes">
+      <h2 id="modes">02 / 实际检索模式</h2>
+      <p>README 列五种检索模式；SDK、REST 还接受 <code>bypass</code>，默认均为 <code>mix</code>。下表描述关键词正常提取时的主路径。<a class="ref" href="#s3">[3]</a><a class="ref" href="#s4">[4]</a></p>
+      <div class="table-wrap">
+        <table aria-label="LightRAG 检索模式与实际执行差别">
+          <thead><tr><th scope="col">模式</th><th scope="col">检索入口</th><th scope="col">执行差别</th></tr></thead>
+          <tbody>
+            <tr><td><code>naive</code></td><td>原问题 → 文本块向量</td><td>不查图；块候选可重排、截断。</td></tr>
+            <tr><td><code>local</code></td><td>低层关键词 → 实体向量</td><td>取实体及相邻边，再映射来源块；实体按相似度，关联边按度数、权重排序。</td></tr>
+            <tr><td><code>global</code></td><td>高层主题词 → 关系向量</td><td>取关系及端点实体，再映射来源块；不是扫描全库，也不是社区报告。</td></tr>
+            <tr><td><code>hybrid</code></td><td>local ＋ global</td><td>交替合并实体、关系并去重；仍会取图关联的原文块。</td></tr>
+            <tr><td><code>mix</code></td><td>hybrid ＋ 原问题的块向量召回</td><td>合并图关联块与直接命中块，再统一重排、限额。</td></tr>
+            <tr><td><code>bypass</code></td><td>无检索</td><td>直接调用 LLM；检索数据接口返回空数据。</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="small">关键词通常由 LLM 提取，也可显式传入；缺词存在回退分支。图关联块可按 VECTOR 相似度或 WEIGHT 加权轮询筛选。这里的 hybrid/mix 不等于“BM25＋向量＋RRF”：该路径实际采用轮流合并与去重，并无 RRF 打分。</p>
+    </section>
+
+    <section aria-labelledby="mechanisms">
+      <h2 id="mechanisms">03 / 已核实机制与前提</h2>
+      <ul>
+        <li><strong>构图与更新：</strong>LLM 逐块抽取实体、关系，合并描述并更新图及向量索引，以 <code>source_id</code> 连接来源块。新增内容可增量合并；删除文档会清理贡献，并利用剩余块的抽取缓存重建受影响图元素。依赖抽取质量、缓存及来源映射完整性，不等于自动管理法规时效。<a class="ref" href="#s5">[5]</a></li>
+        <li><strong>重排与引用：</strong>重排针对候选文本块，须启用且配置重排函数；未配置或失败会回退，之后仍受分数阈值、块数及 token 预算限制。引用由块的 <code>file_path</code> 映射生成；REST 默认返回引用，SDK 默认关闭该开关，<code>/query/data</code> 可取证据数据。引用不等于逐句正确性证明。<a class="ref" href="#s3">[3]</a><a class="ref" href="#s6">[6]</a></li>
+        <li><strong>运行与解析：</strong>需要抽取/回答模型、embedding 及图、向量、KV、文档状态存储；更换 embedding 须重建相关向量。小规模试验可从默认本地存储起步，扩大语料时需另行评估存储、并发和恢复能力；本次没有测定其规模上限。当前已有标题/表格感知的 P 分块，但须解析器产出结构化 sidecar，缺失会退化，不能认为上传 PDF 就自动无损。<a class="ref" href="#s1">[1]</a><a class="ref" href="#s7">[7]</a></li>
+      </ul>
+    </section>
+
+    <section aria-labelledby="evidence">
+      <h2 id="evidence">04 / 优势有哪一级证据？</h2>
+      <p><span class="label">作者宣称：</span>更全面的跨文档问答、更低检索及增量更新成本。<span class="label">架构可推导：</span>实体/关系可补充词面不相似的关联证据，mix 保留原文通道；代价是额外抽取、索引与错误传播。<span class="label">作者实验：</span>UltraDomain 四领域、每域125题，主要由 GPT-4o-mini 比较全面性、多样性等回答胜率；这不是中文环境政策条款召回率。其成本比较也不能直接等同当前端到端成本。<strong>本次没有实测收益。</strong><a class="ref" href="#s2">[2]</a></p>
+    </section>
+
+    <section aria-labelledby="coverage">
+      <h2 id="coverage">05 / 对“某年某市有哪些措施”的判断</h2>
+      <p>图关联可能找回散落在多份文件中的措施，但<strong>global 不保证全量，mix 不保证无遗漏</strong>。解析漏掉标题、表格或附录，抽取漏关系，同名实体误合并，图来源数上限、top-k、重排过滤和上下文截断，都可能损失条款；生成阶段还可能漏列或混淆新旧版本。</p>
+      <p>当前查询上下文是图信息与选中块；虽有 <code>full_docs</code> 存储，<strong>默认查询不自动返回命中文档全文</strong>。优先另建文档/条款目录，明确“当年发布”还是“当年有效”，按地区、生效/废止期筛选，再按文档ID遍历正文、表格、附录并汇总去重。该穷举通道需自行实现；只有限定语料和规则后才能评估完整性，图检索只是补充发现手段。</p>
+    </section>
+
+    <section aria-labelledby="experiment">
+      <h2 id="experiment">06 / 小范围个人实验路线（待实施）</h2>
+      <p class="callout"><strong>以下规模与次数均为实验建议，不是已完成数据或成绩。</strong>仅用公开文件，不复制公司私有语料。</p>
+      <ol>
+        <li><strong>定标：</strong>选2市、3年约60份政策，含修订版、表格与附录；设计30题，10题调参、20题封存测试。人工通读限定语料，标注措施/条款ID、版本和证据页，复核金标，加入无答案题。</li>
+        <li><strong>对照：</strong>A复现现有“混合检索＋RRF＋rerank＋父章节召回”；B使用 LightRAG mix。同文档、同 MinerU 解析与分块、embedding、重排模型、回答模型和上下文预算；记录各路候选数，避免只给B更多预算。用 naive/hybrid 作模式消融；P分块另测，不与图收益混算。</li>
+        <li><strong>验证：</strong>分别测候选、最终上下文及答案的条款召回率；报告答案精确率、全项覆盖题率、引用正确率、时效误配率，以及 p50/p95 延迟、token/费用与索引成本。对照使用相同缓存条件，建议重复3轮；按题配对报告，不只选成功案例。</li>
+        <li><strong>归因：</strong>A、B分别加同一目录过滤/全文遍历通道，隔离其收益；再做一次新增/替换/删除回归。留存源码提交、配置、语料清单、金标、原始检索日志与失败案例，按解析→抽取→召回→截断→生成定位遗漏。</li>
+      </ol>
+      <p><strong>完成并验证后才能使用的个人项目模板：</strong></p>
+      <blockquote>“独立实现环境政策条款完整性评测，对比混合检索与 LightRAG，建设版本约束及证据回溯；在［公开测试集］上记录［实际指标及代价］，分析遗漏来源。”</blockquote>
+    </section>
+
+    <section class="boundary" aria-labelledby="boundary">
+      <h2 id="boundary">07 / 经历边界</h2>
+      <p><strong>现有公司实践：</strong>3年后端，首年Java、之后Java与Python Agent/RAG并行；正式上线Agent的相关负责人；Spring AI按模块封装Java数据服务为MCP；约4.4万份环境文件，已实践MinerU、分块、混合检索、RRF、rerank及父章节召回。以上为用户提供事实。</p>
+      <p><strong>计划中的个人实战：</strong>LightRAG、图检索、目录约束与完整性评测。<strong>尚无证据的收益：</strong>召回提升、降本、低延迟或“解决遗漏”；不得写成公司业绩。RBAC、限流熔断亦未实施，不纳入已完成经历。</p>
+    </section>
+  </article>
+
+  <section class="sources" aria-labelledby="sources-title">
+    <h2 id="sources-title">官方来源与定位</h2>
+    <p>均检索于2026-09-21；GitHub 经 gh CLI 读取。代码及文档链接固定于完整提交 <code>c7e7a24fc85b4dd904e9494b2053b9a529515406</code>（提交时间2026-09-20 02:02:33 UTC），论文固定为v3；发布版本与main快照分开记录。</p>
+    <ol>
+      <li id="s1"><a href="https://github.com/HKUDS/LightRAG/blob/c7e7a24fc85b4dd904e9494b2053b9a529515406/README.md#L260-L365">官方 README：定位、模式、模型及存储前提</a>；<a href="https://github.com/HKUDS/LightRAG/releases/tag/v1.5.7">v1.5.7 发布页</a>；<a href="https://github.com/HKUDS/LightRAG/commit/c7e7a24fc85b4dd904e9494b2053b9a529515406">核验提交</a>。</li>
+      <li id="s2"><a href="https://arxiv.org/abs/2410.05779">arXiv：身份及版本日期</a>；<a href="https://arxiv.org/html/2410.05779v3">论文v3：方法、实验与效率分析</a>；<a href="https://github.com/HKUDS/LightRAG/blob/c7e7a24fc85b4dd904e9494b2053b9a529515406/docs/Reproduce.md">官方复现说明与评判提示词</a>。</li>
+      <li id="s3"><a href="https://github.com/HKUDS/LightRAG/blob/c7e7a24fc85b4dd904e9494b2053b9a529515406/lightrag/base.py#L89-L175">QueryParam：模式与默认值</a>；<a href="https://github.com/HKUDS/LightRAG/blob/c7e7a24fc85b4dd904e9494b2053b9a529515406/lightrag/api/routers/query_routes.py#L40-L151">REST 参数</a>；<a href="https://github.com/HKUDS/LightRAG/blob/c7e7a24fc85b4dd904e9494b2053b9a529515406/lightrag/lightrag.py#L5140-L5189">查询分派与 bypass</a>。</li>
+      <li id="s4"><a href="https://github.com/HKUDS/LightRAG/blob/c7e7a24fc85b4dd904e9494b2053b9a529515406/lightrag/operate.py#L5280-L5498">模式分支与图结果融合</a>；<a href="https://github.com/HKUDS/LightRAG/blob/c7e7a24fc85b4dd904e9494b2053b9a529515406/lightrag/operate.py#L5765-L5870">块合并</a>；<a href="https://github.com/HKUDS/LightRAG/blob/c7e7a24fc85b4dd904e9494b2053b9a529515406/lightrag/operate.py#L6200-L6824">实体、关系及来源块选择</a>。</li>
+      <li id="s5"><a href="https://github.com/HKUDS/LightRAG/blob/c7e7a24fc85b4dd904e9494b2053b9a529515406/lightrag/operate.py#L2429-L2768">节点合并、来源上限与向量写入</a>；<a href="https://github.com/HKUDS/LightRAG/blob/c7e7a24fc85b4dd904e9494b2053b9a529515406/lightrag/operate.py#L3942-L4250">逐块抽取</a>；<a href="https://github.com/HKUDS/LightRAG/blob/c7e7a24fc85b4dd904e9494b2053b9a529515406/lightrag/lightrag.py#L6727-L6735">文档删除与受影响图元素重建</a>。</li>
+      <li id="s6"><a href="https://github.com/HKUDS/LightRAG/blob/c7e7a24fc85b4dd904e9494b2053b9a529515406/lightrag/utils.py#L6934-L7145">重排、回退、阈值及截断</a>；<a href="https://github.com/HKUDS/LightRAG/blob/c7e7a24fc85b4dd904e9494b2053b9a529515406/lightrag/utils.py#L7738-L7798">引用ID与文件路径映射</a>。</li>
+      <li id="s7"><a href="https://github.com/HKUDS/LightRAG/blob/c7e7a24fc85b4dd904e9494b2053b9a529515406/docs/ParagraphSemanticChunking.md#L5-L40">P分块：结构化输入、标题/表格边界及退化条件</a>。</li>
+    </ol>
+  </section>
+  <footer>研究交付物 · 自包含静态 HTML · 无外部资源、无脚本、未对外发布</footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,67 @@
+# 设计配置：当前离线工具不加载本文件，未来实现 Config 适配器时再接入。
+# 这里的容量和重试值只用于小样本开发起点，未进行性能验证。
+schema_version = 1
+stage = "offline-only"
+
+[network]
+enabled = false
+require_explicit_run_approval = true
+
+[data]
+allowed_kinds = ["public", "synthetic"]
+separate_runs_by_kind = true
+allow_private_upload = false
+local_quarantine = "data/local"
+
+[api.chat]
+protocol = "unverified"
+base_url_env = "RAG_CHAT_BASE_URL"
+model_env = "RAG_CHAT_MODEL"
+api_key_env = "RAG_CHAT_API_KEY"
+
+[api.embedding]
+protocol = "unverified"
+base_url_env = "RAG_EMBED_BASE_URL"
+model_env = "RAG_EMBED_MODEL"
+api_key_env = "RAG_EMBED_API_KEY"
+
+[api.rerank]
+protocol = "unverified"
+base_url_env = "RAG_RERANK_BASE_URL"
+model_env = "RAG_RERANK_MODEL"
+api_key_env = "RAG_RERANK_API_KEY"
+enabled = false
+
+[storage]
+metadata_backend = "postgresql"
+postgres_dsn_env = "RAG_POSTGRES_DSN"
+vector_backend = "qdrant"
+qdrant_url_env = "RAG_QDRANT_URL"
+qdrant_api_key_env = "RAG_QDRANT_API_KEY"
+cache_backend = "redis"
+redis_url_env = "RAG_REDIS_URL"
+graph_backend = "lightrag-unconfigured"
+
+[cache]
+# 仅为设计配置，尚无运行时实现；默认关闭，先完成正确性与失效测试。
+enabled = false
+exact_answer_enabled = false
+retrieval_result_enabled = false
+semantic_answer_enabled = false
+semantic_answer_allowed_modes = ["concept_qa"]
+require_knowledge_snapshot = true
+require_scope_isolation = true
+allow_partial_result = false
+allow_unanswerable_result = false
+require_absolute_expiry = true
+
+[runtime]
+max_inflight_model_calls = 2
+request_timeout_seconds = 90
+max_attempts = 3
+# 不在示例中配置费用上限为0或无限；首次联网前按实际服务确认预算。
+
+[evaluation]
+require_complete_case_set = true
+require_external_judgments = true
+allow_synthetic_as_real_world_benchmark = false

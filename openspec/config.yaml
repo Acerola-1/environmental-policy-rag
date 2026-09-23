@@ -1,0 +1,31 @@
+schema: spec-driven
+
+context: |
+  Language: zh-CN. All artifacts use Chinese prose; keep OpenSpec structural headings and SHALL/MUST keywords in English.
+  This is a local environmental-policy RAG project, not proof of company production outcomes.
+  Python is the application/evaluation language. PostgreSQL stores original blocks and versions; Qdrant stores retrieval indexes; Redis is rebuildable cache.
+  The user already deployed these services in Apple Container and permits starting them when needed; project connectivity is not verified. Never reinstall or clear existing services without approval.
+  Reuse MinerU parsing and verified LightRAG conversion capabilities; do not implement OCR. LightRAG may be introduced early, but parsing must not implicitly invoke graph construction or extra models.
+  Eight real PDFs (139 pages) are in data/local/原始文档-解析前/; inventory.json is an inventory, not the existing evaluation manifest contract.
+  The first parsing batch is air-01, water-02, air-03 (28 pages), with full ZIP/JSON/assets. Other samples and the whole desktop dataset are outside this upload scope.
+  data/local/原始文档-解析后/ was empty at planning time. Online parsing, storage, retrieval and graph functions are not implemented; only offline validation/scoring tools exist.
+  Secrets must never enter artifacts or command arguments. A previously exposed MinerU token must be rotated and configured locally; first submission requires secure configuration and quota confirmation.
+  Preserve original documents, version identity, block order, page/citation mapping and incomplete/failure states. Synthetic and public evaluation results remain separate; judgments require independent review.
+  Read AGENTS.md for safety rules. Read openspec/README.md for phase dependencies; tasks.md is the authoritative execution checklist. Existing docs/ remain technical references and dated facts.
+  The implementation facts above describe initialization on 2026-09-23, not perpetual blockers. Verify actual files and updated tasks when resuming; update dated facts when implementation changes.
+  Creating this plan authorizes writing and validating artifacts only, not deployment, model calls, load tests or implementation of all phases; later execution must follow the user's then-current authorization.
+
+rules:
+  proposal:
+    - Include Why, What Changes, Capabilities, Impact and Dependencies; enumerate exact predecessor change IDs and link their proposal.md files.
+    - Declare only the new capability owned by this change; do not modify a capability that has not been archived into main specs.
+  specs:
+    - New capabilities need a Purpose of at least 50 characters, ADDED Requirements, SHALL or MUST, and WHEN/THEN scenarios for success and failure boundaries.
+    - Describe observable behavior, not internal function names or framework internals.
+  design:
+    - Include Context, Goals / Non-Goals, Decisions, Risks / Trade-offs, and a handoff section with verified facts, blockers, entry action and expected evidence.
+    - Label future paths and interfaces as planned; do not turn research claims into working functionality.
+  tasks:
+    - Use numbered checkbox tasks; each task must include its verification or evidence artifact. Check off only existing, actually verified work.
+    - Each stage must cover success, failure, repeat/idempotency, scope/version boundaries where applicable and final evidence handoff.
+    - Keep credentials, permission and cost gates explicit; do not count OpenSpec artifact completion as implementation completion.
